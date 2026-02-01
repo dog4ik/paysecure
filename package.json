@@ -1,0 +1,26 @@
+{
+  "name": "paysecure",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.8",
+    "@hono/zod-openapi": "^1.2.0",
+    "@hono/zod-validator": "^0.7.6",
+    "@libsql/client": "^0.17.0",
+    "axios": "^1.13.4",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.4",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}
