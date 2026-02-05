@@ -6,6 +6,7 @@ import { PayinRequestSchema } from "./connect/payin.js";
 import { StatusRequestSchema } from "./connect/status.js";
 import { GatewayClient, gatewayStatusMapping } from "./gateway/index.js";
 import { drizzle } from "drizzle-orm/libsql";
+import { migrate } from "drizzle-orm/libsql/migrator";
 import { PaysecureWebhookSchema } from "./gateway/callback.js";
 import type { GwConnectError } from "./connect/error.js";
 import { zValidator } from "./validator_wrapper.js";
@@ -28,6 +29,7 @@ if (Number.isNaN(Port)) {
 }
 
 const drizzleDb = drizzle(requireEnv("DATABASE_URL"));
+await migrate(drizzleDb, { migrationsFolder: "drizzle" });
 export type DrizzleDb = typeof drizzleDb;
 const db = new Db(drizzleDb);
 const app = new Hono();
@@ -176,7 +178,11 @@ app
         currency: callback.message.purchase.currency,
         amount: Math.floor(callback.message.purchase.total * 100),
       };
-      let jwt = await createJwt(rpPayload, mapping.privateKey, Buffer.from(SignKey));
+      let jwt = await createJwt(
+        rpPayload,
+        mapping.privateKey,
+        Buffer.from(SignKey),
+      );
 
       try {
         let body = JSON.stringify(rpPayload);
