@@ -40,4 +40,4 @@ RUN mkdir -p /app/data
 
 ENV DATABASE_URL=/app/data/db.sqlite
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]
