@@ -1,3 +1,4 @@
+import * as jose from "jose";
 import crypto from "node:crypto";
 
 type SecureBlock = {
@@ -10,10 +11,6 @@ type JwtPayload = {
   secure: SecureBlock;
 };
 
-function base64UrlEncode(buffer: Buffer | string): string {
-  return Buffer.from(buffer).toString("base64url");
-}
-
 function generateIV(): Buffer {
   return crypto.randomBytes(16);
 }
@@ -23,7 +20,7 @@ function encryptMerchantKey(
   signKey: Buffer, // 32 bytes
   iv: Buffer,
 ): { encryptedData: string; ivBase64: string } {
-  const cipher = crypto.createCipheriv("aes-256-cbc", signKey, iv);
+  let cipher = crypto.createCipheriv("aes-256-cbc", signKey, iv);
 
   let encrypted = cipher.update(merchantKey, "utf8", "base64");
   encrypted += cipher.final("base64");
@@ -34,39 +31,20 @@ function encryptMerchantKey(
   };
 }
 
-// Simple HS512 JWT encoder (no external jwt library)
-function encodeHS512(payload: object, secret: Buffer): string {
-  const header = {
-    alg: "HS512",
-    typ: "JWT",
-  };
-
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-
-  const input = `${encodedHeader}.${encodedPayload}`;
-
-  const hmac = crypto.createHmac("sha512", secret);
-  hmac.update(input);
-  const signature = base64UrlEncode(hmac.digest());
-
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
-
-export function createJwt(
+export async function createJwt(
   payload: Record<string, any>,
   merchantKey: string,
   signKey: Buffer,
-): string {
-  const iv = generateIV();
+) {
+  let iv = generateIV();
 
-  const { encryptedData, ivBase64 } = encryptMerchantKey(
+  let { encryptedData, ivBase64 } = encryptMerchantKey(
     merchantKey,
     signKey,
     iv,
   );
 
-  const jwtPayload: JwtPayload = {
+  let jwtPayload: JwtPayload = {
     ...payload,
     secure: {
       encrypted_data: encryptedData,
@@ -74,7 +52,12 @@ export function createJwt(
     },
   };
 
-  const token = encodeHS512(jwtPayload, signKey);
-
+  let token = await new jose.SignJWT(jwtPayload)
+    .setProtectedHeader({
+      alg: "HS512",
+      typ: "JWT",
+    })
+    .sign(signKey);
+  console.log(token);
   return token;
 }

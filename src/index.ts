@@ -176,7 +176,7 @@ app
         currency: callback.message.purchase.currency,
         amount: Math.floor(callback.message.purchase.total * 100),
       };
-      let jwt = createJwt(rpPayload, mapping.privateKey, Buffer.from(SignKey));
+      let jwt = await createJwt(rpPayload, mapping.privateKey, Buffer.from(SignKey));
 
       try {
         let body = JSON.stringify(rpPayload);
