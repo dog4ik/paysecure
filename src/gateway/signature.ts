@@ -11,7 +11,6 @@ export function verifySignature(
     "|",
   );
   console.log("Signature string: ", signString);
-  console.log("Asset buffer: ", assetBuffer);
   let verifier = crypto.createVerify("RSA-SHA256");
   verifier.update(signString);
   verifier.end();
