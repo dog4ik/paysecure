@@ -19,17 +19,9 @@ import {
   type CreateSessionRequest,
 } from "./session.js";
 import { ErrorSchema, GatewayError } from "./error.js";
-import { ApiBaseUrl, AppBaseUrl } from "../index.js";
+import { ApiBaseUrl, AppBaseUrl, CallbackUrl } from "../index.js";
+import { StatusResponseSchema } from "./status.js";
 import axios from "axios";
-
-const GatewayStatusSchema = z.enum([
-  "PAID",
-  "PAYMENT_IN_PROCESS",
-  "EXPIRED",
-  "ERROR",
-]);
-
-export type GatewayStatus = z.infer<typeof GatewayStatusSchema>;
 
 export type GatewayResult<T> =
   | {
@@ -41,17 +33,6 @@ export type GatewayResult<T> =
       error: GatewayError;
     };
 
-const StatusResponseSchema = z.object({
-  purchaseId: z.string(),
-  errorMsg: z.string().nullish(),
-  errorCode: z.string().nullish(),
-  status: GatewayStatusSchema,
-  purchase: z.object({
-    total: z.number(),
-    currency: z.string(),
-  }),
-});
-
 export function gatewayStatusMapping(gatewayStatus: string) {
   const StatusMapping: Record<string, ConnectStatus> = {
     PAID: "approved",
@@ -59,7 +40,7 @@ export function gatewayStatusMapping(gatewayStatus: string) {
     EXPIRED: "declined",
     ERROR: "declined",
   };
-  return StatusMapping[gatewayStatus] ?? "pending";
+  return StatusMapping[gatewayStatus.toUpperCase()] ?? "pending";
 }
 
 function throwGatewayErrors<T>(res: GatewayResult<T>) {
@@ -167,12 +148,14 @@ export class GatewayClient {
       brand_id: connectRequest.settings.brand_id,
       client: {
         email: customer.email,
-        full_name: customer.first_name,
+        full_name:
+          `${customer.first_name ?? ""} ${customer.last_name ?? ""}`.trim(),
         country: customer.country,
         stateCode: customer.state,
         street_address: customer.address,
-        city: customer.address,
+        city: customer.city,
         zip_code: customer.postcode,
+        phone: customer.phone,
       },
       purchase: {
         currency: payment.gateway_currency,
@@ -185,12 +168,13 @@ export class GatewayClient {
       },
       // totalAmount: payment.gateway_amount / 100, // optional, but if present have precedence over sum of prices mentioned above.
       paymentMethod:
-        connectRequest.settings.method ??
         normalizeExtraReturnParam(connectRequest.payment.extra_return_param) ??
         "APPLEPAY-REDIRECT",
       success_redirect: connectRequest.processing_url,
       failure_redirect: connectRequest.processing_url,
       pending_redirect: connectRequest.processing_url,
+      success_callback: CallbackUrl,
+      failure_callback: CallbackUrl,
     };
 
     return await this.apiRequest(
@@ -224,7 +208,8 @@ export class GatewayClient {
         dateOfBirth: customer.birthday,
         emailId: customer.email,
         merchantCustomerId: payment.lead_id.toString(),
-        fullName: customer.first_name,
+        fullName:
+          `${customer.first_name ?? ""} ${customer.last_name ?? ""}`.trim(),
         phoneNo: customer.phone,
         zipCode: customer.postcode,
         stateCode: customer.state,
@@ -256,11 +241,13 @@ export class GatewayClient {
         },
       ],
       // totalAmount: "22", // optional, but if present have precedence over sum of prices mentioned above.
+      paymentMethod:
+        normalizeExtraReturnParam(payment.extra_return_param) ?? undefined,
       success_redirect: connectRequest.processing_url,
       failure_redirect: connectRequest.processing_url,
       pending_redirect: connectRequest.processing_url,
-      success_callback: "https://your.success.callback.com",
-      failure_callback: "https://your.failure.callback.com",
+      success_callback: CallbackUrl,
+      failure_callback: CallbackUrl,
     };
 
     return await this.apiRequest(

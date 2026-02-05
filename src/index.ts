@@ -15,17 +15,19 @@ import type { InteractionLog } from "./interaction_logs.js";
 import { requireEnv } from "./env.js";
 import { Db } from "./db/index.js";
 import { normalizeExtraReturnParam } from "./connect/index.js";
+import { verifySignature } from "./gateway/signature.js";
 
 export const BusinessUrl = requireEnv("BUSINESS_URL");
 export const SignKey = requireEnv("SIGN_KEY");
 export const ApiBaseUrl = requireEnv("API_BASE_URL");
 export const AppBaseUrl = requireEnv("APP_BASE_URL");
+export const CallbackUrl = requireEnv("CALLBACK_URL");
 export const Port = parseInt(requireEnv("PORT"));
 if (Number.isNaN(Port)) {
   throw Error(`Invalid port number value`);
 }
 
-const drizzleDb = drizzle(requireEnv("DB_FILE_NAME"));
+const drizzleDb = drizzle(requireEnv("DATABASE_URL"));
 export type DrizzleDb = typeof drizzleDb;
 const db = new Db(drizzleDb);
 const app = new Hono();
@@ -73,15 +75,11 @@ app
     );
 
     try {
-      if (extraReturnParam) {
+      if (extraReturnParam && !payRequest.settings.force_cashier) {
         let response = await gateway.purchasesPayin(payRequest);
         let gateway_token = response.purchaseId;
 
-        await db.safeSaveMapping(
-          payRequest.payment.merchant_private_key,
-          gateway_token,
-          payRequest.payment.token,
-        );
+        await db.safeSaveMapping(payRequest, gateway_token);
 
         let rpStatus = gatewayStatusMapping(response.status);
         return c.json({
@@ -104,11 +102,7 @@ app
         let response = await gateway.cashierPayin(payRequest);
         let gateway_token = response.sessionId;
 
-        await db.safeSaveMapping(
-          payRequest.payment.merchant_private_key,
-          gateway_token,
-          payRequest.payment.token,
-        );
+        await db.safeSaveMapping(payRequest, gateway_token);
 
         return c.json({
           status: "pending",
@@ -148,33 +142,63 @@ app
     zValidator("json", PaysecureWebhookSchema),
     async (c) => {
       let callback = c.req.valid("json");
-      let mapping = await db.getMapping(callback.message.purchaseId);
+      let mapping = await db.getMapping(
+        callback.message.sessionId || callback.message.purchaseId,
+      );
       if (!mapping) {
         console.log("Failed to find purchase id in merchant key mapping");
         return c.json({ message: "Purchase not found" }, 404);
       }
 
+      let sign =
+        c.req.header("paysecure-sign") ?? c.req.header("paysecure_sign");
+      if (sign === undefined) {
+        console.log("Missing callback signature headers");
+        return c.json({ message: "Invalid request parameters" }, 400);
+      }
+
+      try {
+        verifySignature(callback, mapping.publicKey, sign);
+      } catch (e) {
+        console.log("Failed to verify callback signature", e);
+        return c.json({ message: "Failed to verify signature" }, 400);
+      }
+
       let url =
         BusinessUrl + `/callbacks/v2/gateway_callbacks/${mapping.token}`;
       let rpStatus = gatewayStatusMapping(callback.status);
-      let payload = {
+      let rpPayload = {
         status: rpStatus,
         reason:
           rpStatus === "declined"
             ? callback.message.errorMsg || callback.status
             : undefined,
-        currency: callback.message.payment.currency,
-        amount: Math.floor(callback.message.payment.amount * 100),
+        currency: callback.message.purchase.currency,
+        amount: Math.floor(callback.message.purchase.total * 100),
       };
-      let jwt = createJwt(payload, mapping.private_key, Buffer.from(SignKey));
-      await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      let jwt = createJwt(rpPayload, mapping.privateKey, Buffer.from(SignKey));
+
+      try {
+        let body = JSON.stringify(rpPayload);
+        console.log("Sending callback to Gateway Connect", url, body);
+
+        let res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${jwt}`,
+          },
+          body,
+        });
+        console.log(`Gateway connect callback response status: ${res.status}`);
+        if (!res.ok) {
+          throw Error(`bad response status code: ${res.status}`);
+        }
+        return c.body(null, 200);
+      } catch (e) {
+        console.log("Failed to send callback to RP", e);
+        return c.json({ message: "Failed to process callback" }, 500);
+      }
     },
   );
 

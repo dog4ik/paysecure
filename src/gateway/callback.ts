@@ -15,32 +15,23 @@ export const TransactionStatusEnum = z.enum([
 ]);
 
 const PurchaseSchema = z.object({
-  currency: z.string().length(3), // ISO 4217
+  currency: z.string(), // ISO 4217
   total: z.number(),
-});
-
-const PaymentSchema = z.object({
-  payment_type: z.string(),
-  amount: z.number(),
-  currency: z.string(),
 });
 
 const MessageSchema = z.object({
   purchaseId: z.string(),
-  type: z.string(),
-  paymentMethod: z.string(), // comma-separated list
+  sessionId: z.string().nullish(),
   amountUnit: z.enum(["MAJOR", "MINOR"]),
-  errorMsg: z.string().optional(),
-  created_on: z.number(),
-  merchantRef: z.string(),
-  merchantName: z.string(),
+  errorMsg: z.string().nullish(),
   purchase: PurchaseSchema,
-  payment: PaymentSchema,
+  brand_id: z.string(),
   status: z.string(),
-  reference: z.string(),
 });
 
 export const PaysecureWebhookSchema = z.object({
   message: MessageSchema,
   status: z.string(), // duplicate of message.status
 });
+
+export type PaysecureWebhook = z.infer<typeof PaysecureWebhookSchema>;

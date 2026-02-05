@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SettingsSchema, type ConnectStatus } from "./index.js";
+import { PayinSettingsSchema, type ConnectStatus } from "./index.js";
 import type { InteractionLog } from "../interaction_logs.js";
 
 export const BankAccountSchema = z.object({
@@ -43,7 +43,7 @@ export const PayinRequestSchema = z.object({
   payment: PaymentSchema,
   processing_url: z.string(),
   callback_url: z.string(),
-  settings: SettingsSchema,
+  settings: PayinSettingsSchema,
 });
 
 export type ConnectPayinRequest = z.infer<typeof PayinRequestSchema>;

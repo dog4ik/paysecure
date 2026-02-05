@@ -2,17 +2,7 @@ import { z } from "zod";
 
 export type CreatePaymentParams = {
   client?: {
-    /**
-     * Conditional.
-     * Recommended to pass the complete name of the client.
-     * At least 2 words recommended.
-     */
     full_name?: string | null;
-
-    /**
-     * Conditional.
-     * Recommended to pass a valid email address.
-     */
     email?: string;
 
     country?: string | null;
@@ -20,6 +10,7 @@ export type CreatePaymentParams = {
     street_address?: string | null;
     city?: string | null;
     zip_code?: string | null;
+    phone?: string | null;
   };
 
   /**
@@ -65,17 +56,10 @@ export type CreatePaymentParams = {
    */
   success_redirect: string;
 
-  /**
-   * Mandatory.
-   * Redirect URL when the transaction is in progress.
-   */
   pending_redirect: string;
-
-  /**
-   * Mandatory.
-   * Redirect URL when the transaction fails.
-   */
   failure_redirect: string;
+  success_callback: string;
+  failure_callback: string;
 };
 
 const ProductSchema = z.object({
