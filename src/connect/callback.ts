@@ -52,12 +52,10 @@ export async function createJwt(
     },
   };
 
-  let token = await new jose.SignJWT(jwtPayload)
+  return await new jose.SignJWT(jwtPayload)
     .setProtectedHeader({
       alg: "HS512",
       typ: "JWT",
     })
     .sign(signKey);
-  console.log(token);
-  return token;
 }

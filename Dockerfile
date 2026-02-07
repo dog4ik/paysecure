@@ -40,6 +40,4 @@ COPY --from=builder /app/drizzle.config.ts ./
 
 RUN mkdir -p /app/data
 
-ENV DATABASE_URL=/app/data/db.sqlite
-
 CMD ["node", "dist/src/index.js"]

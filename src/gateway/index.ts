@@ -132,9 +132,8 @@ export class GatewayClient {
   }
 
   async status(request: ConnectStatusRequest) {
-    let span = new InteractionSpan("status");
     return await this.apiRequest(
-      span,
+      this.interactionLogs.span("status"),
       "GET",
       `/api/v1/purchases/${request.payment.gateway_token}`,
       StatusResponseSchema,
